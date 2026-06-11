@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.wmixvideo</groupId>
     <artifactId>nfe</artifactId>
-    <version>5.0.51-SNAPSHOT</version>
+    <version>5.0.58-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>nfe</name>
     <description>Biblioteca de comunicacao de nota fiscal eletronica brasileira</description>
@@ -20,7 +20,7 @@
         <url>git@github.com:wmixvideo/nfe.git</url>
         <connection>scm:git:git@github.com:wmixvideo/nfe.git</connection>
         <developerConnection>scm:git:git@github.com:wmixvideo/nfe.git</developerConnection>
-        <tag>v5.0.50</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <developers>
@@ -32,8 +32,8 @@
     </developers>
 
     <properties>
-        <java.version>8</java.version>
-        <slf4j.version>2.0.13</slf4j.version>
+        <java.version>11</java.version>
+        <slf4j.version>2.0.18</slf4j.version>
         <junit.version>4.13.2</junit.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
