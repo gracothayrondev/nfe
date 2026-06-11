@@ -1,10 +1,22 @@
 package com.fincatto.documentofiscal.nfe400.webservices;
 
+import java.io.StringReader;
+import java.util.Iterator;
+
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+
+import org.apache.axiom.om.OMElement;
+import org.apache.axiom.om.impl.builder.StAXOMBuilder;
+import org.apache.commons.lang3.StringUtils;
+
 import com.fincatto.documentofiscal.DFLog;
 import com.fincatto.documentofiscal.DFModelo;
 import com.fincatto.documentofiscal.nfe.NFTipoEmissao;
 import com.fincatto.documentofiscal.nfe.NFeConfig;
 import com.fincatto.documentofiscal.nfe400.classes.NFAutorizador400;
+import com.fincatto.documentofiscal.nfe400.classes.NFTipoImpressao;
 import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvio;
 import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvioRetorno;
 import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvioRetornoDados;
@@ -14,19 +26,13 @@ import com.fincatto.documentofiscal.nfe400.utils.NFGeraChave;
 import com.fincatto.documentofiscal.nfe400.utils.qrcode20.NFGeraQRCode20;
 import com.fincatto.documentofiscal.nfe400.utils.qrcode20.NFGeraQRCodeContingenciaOffline20;
 import com.fincatto.documentofiscal.nfe400.utils.qrcode20.NFGeraQRCodeEmissaoNormal20;
+import com.fincatto.documentofiscal.nfe400.utils.qrcode30.NFGeraQRCode30;
+import com.fincatto.documentofiscal.nfe400.utils.qrcode30.NFGeraQRCodeContingenciaOffline30;
+import com.fincatto.documentofiscal.nfe400.utils.qrcode30.NFGeraQRCodeEmissaoNormal30;
 import com.fincatto.documentofiscal.nfe400.webservices.gerado.NFeAutorizacao4Stub;
 import com.fincatto.documentofiscal.nfe400.webservices.gerado.NFeAutorizacao4Stub.NfeResultMsg;
 import com.fincatto.documentofiscal.utils.DFAssinaturaDigital;
 import com.fincatto.documentofiscal.validadores.DFXMLValidador;
-import org.apache.axiom.om.OMElement;
-import org.apache.axiom.om.impl.builder.StAXOMBuilder;
-import org.apache.commons.lang3.StringUtils;
-
-import javax.xml.stream.XMLInputFactory;
-import javax.xml.stream.XMLStreamException;
-import javax.xml.stream.XMLStreamReader;
-import java.io.StringReader;
-import java.util.Iterator;
 
 class WSLoteEnvio implements DFLog {
 
@@ -77,7 +83,7 @@ class WSLoteEnvio implements DFLog {
                     qtdNF++;
                     break;
                 case NFCE:
-                    NFGeraQRCode20 geraQRCode = getNfGeraQRCode20(nota);
+                    NFGeraQRCode30 geraQRCode = getNfGeraQRCode30(nota);
 
                     nota.setInfoSuplementar(new NFNotaInfoSuplementar());
                     nota.getInfoSuplementar().setUrlConsultaChaveAcesso(geraQRCode.urlConsultaChaveAcesso());
@@ -103,6 +109,17 @@ class WSLoteEnvio implements DFLog {
             return new NFGeraQRCodeContingenciaOffline20(nota, this.config);
         } else {
             throw new IllegalArgumentException("QRCode 2.0 Tipo Emissao nao implementado: "
+                    + nota.getInfo().getIdentificacao().getTipoEmissao().getDescricao());
+        }
+    }
+    
+    private NFGeraQRCode30 getNfGeraQRCode30(NFNota nota) {
+    	if (NFTipoEmissao.EMISSAO_NORMAL.equals(nota.getInfo().getIdentificacao().getTipoEmissao())) {
+            return new NFGeraQRCodeEmissaoNormal30(nota, this.config);
+        } else if (NFTipoEmissao.CONTIGENCIA_OFFLINE.equals(nota.getInfo().getIdentificacao().getTipoEmissao())) {
+            return new NFGeraQRCodeContingenciaOffline30(nota, this.config);
+        } else {
+            throw new IllegalArgumentException("QRCode 3.0 Tipo Emissao nao implementado: "
                     + nota.getInfo().getIdentificacao().getTipoEmissao().getDescricao());
         }
     }
