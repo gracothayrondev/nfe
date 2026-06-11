@@ -80,6 +80,15 @@ class WSLoteEnvio implements DFLog {
         for (final NFNota nota : loteAssinado.getNotas()) {
             switch (nota.getInfo().getIdentificacao().getModelo()) {
                 case NFE:
+                	
+                	if (NFTipoImpressao.DANFE_SIMPLIFICADO_TIPO_2.equals(nota.getInfo().getIdentificacao().getTipoImpressao())) {
+                		NFGeraQRCode30 geraQRCode = getNfGeraQRCode30(nota);
+
+                        nota.setInfoSuplementar(new NFNotaInfoSuplementar());
+                        nota.getInfoSuplementar().setUrlConsultaChaveAcesso(geraQRCode.urlConsultaChaveAcesso());
+                        nota.getInfoSuplementar().setQrCode(geraQRCode.getQRCode());
+                	}
+                	
                     qtdNF++;
                     break;
                 case NFCE:
