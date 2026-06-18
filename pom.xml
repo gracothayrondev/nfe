@@ -2,7 +2,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.github.wmixvideo</groupId>
     <artifactId>nfe</artifactId>
-    <version>5.0.51-SNAPSHOT</version>
+    <version>5.0.61</version>
     <packaging>jar</packaging>
     <name>nfe</name>
     <description>Biblioteca de comunicacao de nota fiscal eletronica brasileira</description>
@@ -20,7 +20,7 @@
         <url>git@github.com:wmixvideo/nfe.git</url>
         <connection>scm:git:git@github.com:wmixvideo/nfe.git</connection>
         <developerConnection>scm:git:git@github.com:wmixvideo/nfe.git</developerConnection>
-        <tag>v5.0.50</tag>
+        <tag>v5.0.61</tag>
     </scm>
 
     <developers>
@@ -187,7 +187,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.14</version>
+                <version>0.8.15</version>
                 <executions>
                     <execution>
                         <id>prepare-agent</id>
@@ -316,7 +316,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
-                        <version>3.5.5</version>
+                        <version>3.5.6</version>
                     </plugin>
                 </plugins>
             </build>
