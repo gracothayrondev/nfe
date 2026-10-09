@@ -1,9 +1,10 @@
 package com.fincatto.documentofiscal.validadores;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
 import java.net.URISyntaxException;
-import java.net.URL;
+import javax.xml.XMLConstants;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
@@ -11,12 +12,41 @@ import org.xml.sax.SAXException;
 
 public final class DFXMLValidador {
 
+    /**
+     * Carrega o XSD do pacote informado e valida o XML contra ele.
+     * <br><br>
+     * O XSD principal e o conteudo de todos os seus includes e imports vem do classloader, e
+     * nao da reabertura da URL do recurso. Ver {@link DFSchemaResourceResolver} para o motivo,
+     * que envolve jar aninhado sob caminho com acento no Windows.
+     *
+     * @param pacote nome da pasta do pacote de schemas dentro de schemas/
+     * @param xsd    nome do arquivo XSD principal dentro do pacote
+     */
+    private static boolean validaComPacote(final String xml, final String pacote, final String xsd) throws IOException, SAXException {
+        final String recurso = DFSchemaResourceResolver.caminhoDoRecurso(pacote, xsd);
+        final InputStream xsdStream = DFXMLValidador.class.getClassLoader().getResourceAsStream(recurso);
+        if (xsdStream == null) {
+            throw new IOException(String.format("Schema nao encontrado no classpath: %s", recurso));
+        }
+        try {
+            final SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            // Sem o resolver o parser reabre a URL de cada include, e e ai que a resolucao
+            // quebra em caminho com acento.
+            schemaFactory.setResourceResolver(new DFSchemaResourceResolver(pacote));
+            final StreamSource source = new StreamSource(xsdStream);
+            // Identificador estavel do documento. O parser usa para saber que ja carregou aquele
+            // arquivo e nao processar o mesmo XSD duas vezes, o que geraria tipo duplicado.
+            source.setSystemId(recurso);
+            final Schema schema = schemaFactory.newSchema(source);
+            schema.newValidator().validate(new StreamSource(new StringReader(xml)));
+            return true;
+        } finally {
+            xsdStream.close();
+        }
+    }
+
     private static boolean valida(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_008i2/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_008i2", xsd);
     }
 
     public static boolean validaLote(final String arquivoXML) throws Exception {
@@ -28,11 +58,7 @@ public final class DFXMLValidador {
     }
 
     public static boolean valida400(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_010e_NT2025.002_v1.01/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_010e_NT2025.002_v1.01", xsd);
     }
 
     public static boolean validaLote400(final String arquivoXML) throws Exception {
@@ -70,11 +96,7 @@ public final class DFXMLValidador {
      */
     private static boolean validaMDF(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
         System.setProperty("jdk.xml.maxOccurLimit", "20000");
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_MDFe_300b_NT012025_1.03/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_MDFe_300b_NT012025_1.03", xsd);
     }
 
     public static boolean validaLoteMDFe(final String arquivoXML) throws Exception {
@@ -98,11 +120,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaCTe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_CTe_300a_NT2022.001/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_CTe_300a_NT2022.001", xsd);
     }
 
     public static boolean validaLoteCTe300(final String arquivoXML) throws Exception {
@@ -154,11 +172,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaCTe400(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_CTe_400_NT2025.001_RTC_1.14/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_CTe_400_NT2025.001_RTC_1.14", xsd);
     }
 
     public static boolean validaNotaCte400(final String arquivoXML) throws Exception {
@@ -222,29 +236,17 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaDfe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_NFeDistDFe_102/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_NFeDistDFe_102", xsd);
     }
     private static boolean validaDistribuicaoCTe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_CTeDistDFe_100/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_CTeDistDFe_100", xsd);
     }
     public static boolean validaDistribuicaoCTe(final String arquivoXML) throws IOException, SAXException, URISyntaxException {
         return DFXMLValidador.validaDistribuicaoCTe(arquivoXML, "distDFeInt_v1.00.xsd");
     }
 
     private static boolean validaDistribuicaoMDFe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/PL_MDFeDistDFe_100/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "PL_MDFeDistDFe_100", xsd);
     }
     public static boolean validaDistribuicaoMDFe(final String arquivoXML) throws IOException, SAXException, URISyntaxException {
         return DFXMLValidador.validaDistribuicaoMDFe(arquivoXML, "distDFeInt_v1.00.xsd");
@@ -255,11 +257,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaEpec(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        final URL xsdPath = DFXMLValidador.class.getClassLoader().getResource(String.format("schemas/Evento_EPEC_PL_v1.01/%s", xsd));
-        final SchemaFactory schemaFactory = SchemaFactory.newInstance("http://www.w3.org/2001/XMLSchema");
-        final Schema schema = schemaFactory.newSchema(new StreamSource(xsdPath.toURI().toString()));
-        schema.newValidator().validate(new StreamSource(new StringReader(xml)));
-        return true;
+        return DFXMLValidador.validaComPacote(xml, "Evento_EPEC_PL_v1.01", xsd);
     }
 
     public static boolean validaEpec(final String arquivoXML) throws Exception {
