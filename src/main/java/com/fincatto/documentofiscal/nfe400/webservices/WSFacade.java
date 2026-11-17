@@ -1,5 +1,15 @@
 package com.fincatto.documentofiscal.nfe400.webservices;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.UnrecoverableKeyException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
 import com.fincatto.documentofiscal.DFModelo;
 import com.fincatto.documentofiscal.DFUnidadeFederativa;
 import com.fincatto.documentofiscal.nfe.NFeConfig;
@@ -8,90 +18,269 @@ import com.fincatto.documentofiscal.nfe.webservices.distribuicao.WSDistribuicaoN
 import com.fincatto.documentofiscal.nfe400.classes.cadastro.NFRetornoConsultaCadastro;
 import com.fincatto.documentofiscal.nfe400.classes.evento.NFEnviaEventoRetorno;
 import com.fincatto.documentofiscal.nfe400.classes.evento.NFEventoTipoAutor;
-import com.fincatto.documentofiscal.nfe400.classes.evento.cartacorrecao.NFProtocoloEventoCartaCorrecao;
 import com.fincatto.documentofiscal.nfe400.classes.evento.alczfmimportacao.NFDetGrupoConsumoZFM;
-import com.fincatto.documentofiscal.nfe400.classes.evento.consumopessoal.NFDetGrupoConsumo;
-import com.fincatto.documentofiscal.nfe400.classes.evento.apropriacaocomb.NFDetGrupoConsumoCombustivel;
 import com.fincatto.documentofiscal.nfe400.classes.evento.apropriacaobens.NFDetGrupoCredito;
+import com.fincatto.documentofiscal.nfe400.classes.evento.apropriacaocomb.NFDetGrupoConsumoCombustivel;
 import com.fincatto.documentofiscal.nfe400.classes.evento.apropriacaocredito.NFDetGrupoCreditoPresumido;
-import com.fincatto.documentofiscal.nfe400.classes.evento.imobilizacao.NFDetGrupoImobilizacao;
-import com.fincatto.documentofiscal.nfe400.classes.evento.naofornecido.NFDetGrupoItemNaoFornecido;
-import com.fincatto.documentofiscal.nfe400.classes.evento.roubo.NFDetGrupoPerecimento;
+import com.fincatto.documentofiscal.nfe400.classes.evento.cartacorrecao.NFProtocoloEventoCartaCorrecao;
+import com.fincatto.documentofiscal.nfe400.classes.evento.consumopessoal.NFDetGrupoConsumo;
 import com.fincatto.documentofiscal.nfe400.classes.evento.epec.NFEnviaEventoEpecRetorno;
+import com.fincatto.documentofiscal.nfe400.classes.evento.imobilizacao.NFDetGrupoImobilizacao;
 import com.fincatto.documentofiscal.nfe400.classes.evento.inutilizacao.NFRetornoEventoInutilizacao;
 import com.fincatto.documentofiscal.nfe400.classes.evento.manifestacaodestinatario.NFProtocoloEventoManifestacaoDestinatario;
 import com.fincatto.documentofiscal.nfe400.classes.evento.manifestacaodestinatario.NFTipoEventoManifestacaoDestinatario;
+import com.fincatto.documentofiscal.nfe400.classes.evento.naofornecido.NFDetGrupoItemNaoFornecido;
+import com.fincatto.documentofiscal.nfe400.classes.evento.roubo.NFDetGrupoPerecimento;
 import com.fincatto.documentofiscal.nfe400.classes.evento.roubo.NFDetGrupoPerecimentoFornecedor;
 import com.fincatto.documentofiscal.nfe400.classes.lote.consulta.NFLoteConsultaRetorno;
-import com.fincatto.documentofiscal.nfe400.classes.lote.envio.*;
+import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFCancelamentoRetornoDados;
+import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvio;
+import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvioRetorno;
+import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteEnvioRetornoDados;
+import com.fincatto.documentofiscal.nfe400.classes.lote.envio.NFLoteIndicadorProcessamento;
+import com.fincatto.documentofiscal.nfe400.classes.nota.NFNotaProcessada;
 import com.fincatto.documentofiscal.nfe400.classes.nota.consulta.NFNotaConsultaRetorno;
+import com.fincatto.documentofiscal.nfe400.classes.nota.downloadxml.NFCeDownloadXMLRetorno;
+import com.fincatto.documentofiscal.nfe400.classes.nota.listagemchaves.NFCeListagemChavesRetorno;
 import com.fincatto.documentofiscal.nfe400.classes.statusservico.consulta.NFStatusServicoConsultaRetorno;
-import com.fincatto.documentofiscal.nfe400.webservices.gerado.NFeAutorizacao4Stub;
+import com.fincatto.documentofiscal.nfe400.danfe.NFGeraDanfe;
+import com.fincatto.documentofiscal.nfe400.danfe.DanfeNfceAnexo;
+import com.fincatto.documentofiscal.nfe400.danfe.NFGeraDanfeNfce;
+import com.fincatto.documentofiscal.nfe400.danfe.DanfeCreditos;
+import com.fincatto.documentofiscal.utils.DFHttpClient;
+import com.fincatto.documentofiscal.utils.DFSoapFaultException;
 import com.fincatto.documentofiscal.utils.DFSocketFactory;
-import org.apache.commons.httpclient.protocol.Protocol;
 
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
-import java.time.LocalDate;
-import java.util.List;
+/**
+ * Ponto de entrada publico para todos os webservices de NF-e/NFC-e 4.00 (envio/consulta de
+ * lote, status, consulta de nota e cadastro, e a longa lista de eventos - cancelamento, carta
+ * de correcao, EPEC, manifestacao do destinatario, atualizacao de data de previsao de entrega,
+ * aceite de debito de apuracao, imobilizacao, insucesso/comprovante de entrega, entre outros).
+ * A maioria dos eventos compartilha a mecanica de transporte de {@link AbstractWSEvento}.
+ * <p>
+ * Uma instancia deve ser criada uma vez por {@link com.fincatto.documentofiscal.nfe.NFeConfig}/
+ * certificado e reaproveitada entre chamadas - nao recriada por documento fiscal emitido. Cada
+ * instancia mantem um pool de conexoes HTTP proprio e uma thread de fundo (daemon) para
+ * descartar conexoes ociosas; recriar {@link WSFacade} por documento acumula pools e threads
+ * sem chamar {@link #close()} entre eles.
+ */
+public class WSFacade implements Closeable {
 
-public class WSFacade {
-
-    private final WSLoteEnvio wsLoteEnvio;
-    private final WSLoteConsulta wsLoteConsulta;
-    private final WSStatusConsulta wsStatusConsulta;
-    private final WSNotaConsulta wsNotaConsulta;
-    private final WSCartaCorrecao wsCartaCorrecao;
-    private final WSCancelamento wsCancelamento;
-    private final WSConsultaCadastro wsConsultaCadastro;
-    private final WSInutilizacao wsInutilizacao;
-    private final WSManifestacaoDestinatario wSManifestacaoDestinatario;
-    private final WSDistribuicaoNFe wSDistribuicaoNFe;
-    private final WSEpec wsEpec;
-    private final WSAtualizacaoDataPrevisaoEntrega wsAtualizacaoDataPrevisaoEntrega;
-    private final WSAceiteDebitoApuracao wsAceiteDebitoAPuracao;
-    private final WSCancelametoEvento wsCancelametoEvento;
-    private final WSInfoEfetPagIntegral wsInfoEfetPagIntegral;
-    private final WSSolicitacaoApropriacaoCreditoPresumido wsSolicitacaoApropriacaoCreditoPresumido;
-    private final WSSolicitacaoApropriacaoCreditoCombustivel wsSolicitacaoApropriacaoCreditoCombustivel;
-    private final WSRouboTransporteAdquirente wsRouboTransporteAdquirente;
-    private final WSSolicitacaoApropriacaoCreditoBensAtdAdquirinte wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte;
-    private final WSRouboTransporteFornecedor wsRouboTransporteFornecedor;
-    private final WSNaoFornecimentoPagamentoAntecipado wsNaoFornecimentoPagamentoAntecipado;
-    private final WSDestinacaoItemConsumoPessoal wsDestinacaoItemConsumoPessoal;
-    private final WSImobilizacaoItem wsImobilizacaoItem;
-    private final WSImportacaoALCZFMNaoConvertidaIsencao wsImportacaoALCZFMNaoConvertidaIsencao;
+    private final NFeConfig config;
+    private final DFHttpClient httpClient;
+    private volatile WSLoteEnvio wsLoteEnvio;
+    private volatile WSLoteConsulta wsLoteConsulta;
+    private volatile WSStatusConsulta wsStatusConsulta;
+    private volatile WSNotaConsulta wsNotaConsulta;
+    private volatile WSCartaCorrecao wsCartaCorrecao;
+    private volatile WSCancelamento wsCancelamento;
+    private volatile WSConsultaCadastro wsConsultaCadastro;
+    private volatile WSInutilizacao wsInutilizacao;
+    private volatile WSManifestacaoDestinatario wSManifestacaoDestinatario;
+    private volatile WSDistribuicaoNFe wSDistribuicaoNFe;
+    private volatile WSEpec wsEpec;
+    private volatile WSAtualizacaoDataPrevisaoEntrega wsAtualizacaoDataPrevisaoEntrega;
+    private volatile WSAceiteDebitoApuracao wsAceiteDebitoAPuracao;
+    private volatile WSCancelametoEvento wsCancelametoEvento;
+    private volatile WSInfoEfetPagIntegral wsInfoEfetPagIntegral;
+    private volatile WSSolicitacaoApropriacaoCreditoPresumido wsSolicitacaoApropriacaoCreditoPresumido;
+    private volatile WSSolicitacaoApropriacaoCreditoCombustivel wsSolicitacaoApropriacaoCreditoCombustivel;
+    private volatile WSRouboTransporteAdquirente wsRouboTransporteAdquirente;
+    private volatile WSSolicitacaoApropriacaoCreditoBensAtdAdquirinte wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte;
+    private volatile WSRouboTransporteFornecedor wsRouboTransporteFornecedor;
+    private volatile WSNaoFornecimentoPagamentoAntecipado wsNaoFornecimentoPagamentoAntecipado;
+    private volatile WSDestinacaoItemConsumoPessoal wsDestinacaoItemConsumoPessoal;
+    private volatile WSImobilizacaoItem wsImobilizacaoItem;
+    private volatile WSImportacaoALCZFMNaoConvertidaIsencao wsImportacaoALCZFMNaoConvertidaIsencao;
+    private volatile WSNFCeListagemChaves wsNFCeListagemChaves;
+    private volatile WSNFCeDownloadXML wsNFCeDownloadXML;
 
     public WSFacade(final NFeConfig config) throws KeyManagementException, UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
-        Protocol.registerProtocol("https", new Protocol("https", new DFSocketFactory(config), 443));
+        this.config = config;
+        this.httpClient = new DFHttpClient(new DFSocketFactory(config).getSslContext(), config);
+    }
 
-        // inicia os servicos disponiveis da nfe
-        this.wsLoteEnvio = new WSLoteEnvio(config);
-        this.wsLoteConsulta = new WSLoteConsulta(config);
-        this.wsStatusConsulta = new WSStatusConsulta(config);
-        this.wsNotaConsulta = new WSNotaConsulta(config);
-        this.wsCartaCorrecao = new WSCartaCorrecao(config);
-        this.wsCancelamento = new WSCancelamento(config);
-        this.wsConsultaCadastro = new WSConsultaCadastro(config);
-        this.wsInutilizacao = new WSInutilizacao(config);
-        this.wSManifestacaoDestinatario = new WSManifestacaoDestinatario(config);
-        this.wSDistribuicaoNFe = new WSDistribuicaoNFe(config);
-        this.wsEpec = new WSEpec(config);
-        this.wsAtualizacaoDataPrevisaoEntrega = new WSAtualizacaoDataPrevisaoEntrega(config);
-        this.wsAceiteDebitoAPuracao = new WSAceiteDebitoApuracao(config);
-        this.wsCancelametoEvento = new WSCancelametoEvento(config);
-        this.wsInfoEfetPagIntegral = new WSInfoEfetPagIntegral(config);
-        this.wsSolicitacaoApropriacaoCreditoPresumido = new WSSolicitacaoApropriacaoCreditoPresumido(config);
-        this.wsSolicitacaoApropriacaoCreditoCombustivel = new WSSolicitacaoApropriacaoCreditoCombustivel(config);
-        this.wsRouboTransporteAdquirente = new WSRouboTransporteAdquirente(config);
-        this.wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte = new WSSolicitacaoApropriacaoCreditoBensAtdAdquirinte(config);
-        this.wsRouboTransporteFornecedor = new WSRouboTransporteFornecedor(config);
-        this.wsNaoFornecimentoPagamentoAntecipado = new WSNaoFornecimentoPagamentoAntecipado(config);
-        this.wsDestinacaoItemConsumoPessoal = new WSDestinacaoItemConsumoPessoal(config);
-        this.wsImobilizacaoItem = new WSImobilizacaoItem(config);
-        this.wsImportacaoALCZFMNaoConvertidaIsencao = new WSImportacaoALCZFMNaoConvertidaIsencao(config);
+    @Override
+    public void close() throws IOException {
+        if(this.httpClient != null){
+            this.httpClient.close();
+        }
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF, sem logotipo.
+     *
+     * @param xmlNfe XML do nfeProc (NF-e com o protocolo de autorizacao)
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final String xmlNfe) {
+        return this.geraDanfe(xmlNfe, null);
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF.
+     *
+     * @param xmlNfe XML do nfeProc (NF-e com o protocolo de autorizacao)
+     * @param logoImage imagem do logotipo do emitente (PNG, JPEG etc.); se nula ou invalida o espaco fica em branco
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final String xmlNfe, final byte[] logoImage) {
+        return new NFGeraDanfe().gerar(xmlNfe, logoImage);
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF, com rodape personalizado em todas as paginas.
+     *
+     * @param xmlNfe XML do nfeProc (NF-e com o protocolo de autorizacao)
+     * @param logoImage imagem do logotipo do emitente (PNG, JPEG etc.); se nula ou invalida o espaco fica em branco
+     * @param creditos creditos (textos do rodape); se nulo, o DANFE sai sem rodape personalizado
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final String xmlNfe, final byte[] logoImage, final DanfeCreditos creditos) {
+        return new NFGeraDanfe().gerar(xmlNfe, logoImage, creditos);
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF a partir da nota processada, sem logotipo.
+     *
+     * @param nota nota processada (NF-e com o protocolo de autorizacao)
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, estiver incompleta ou sem o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final NFNotaProcessada nota) {
+        return this.geraDanfe(nota, null);
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF a partir da nota processada.
+     *
+     * @param nota nota processada (NF-e com o protocolo de autorizacao)
+     * @param logoImage imagem do logotipo do emitente (PNG, JPEG etc.); se nula ou invalida o espaco fica em branco
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, estiver incompleta ou sem o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final NFNotaProcessada nota, final byte[] logoImage) {
+        return new NFGeraDanfe().gerar(nota, logoImage);
+    }
+
+    /**
+     * Gera o DANFE (NF-e modelo 55, A4 retrato) em PDF a partir da nota processada, com rodape personalizado em todas as paginas.
+     *
+     * @param nota nota processada (NF-e com o protocolo de autorizacao)
+     * @param logoImage imagem do logotipo do emitente (PNG, JPEG etc.); se nula ou invalida o espaco fica em branco
+     * @param creditos creditos (textos do rodape); se nulo, o DANFE sai sem rodape personalizado
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, estiver incompleta ou sem o protocolo de autorizacao
+     */
+    public byte[] geraDanfe(final NFNotaProcessada nota, final byte[] logoImage, final DanfeCreditos creditos) {
+        return new NFGeraDanfe().gerar(nota, logoImage, creditos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF, em papel de 80 mm, sem logotipo e sem rodape personalizado.
+     *
+     * @param xmlNfe XML do nfeProc (NFC-e autorizada) ou, em contingencia off-line, da NFe ainda sem protocolo
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido, nao for de uma NFC-e ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfeNfce(final String xmlNfe) {
+        return this.geraDanfeNfce(xmlNfe, null);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF, em papel de 80 mm e sem logotipo.
+     *
+     * @param xmlNfe XML do nfeProc (NFC-e autorizada) ou, em contingencia off-line, da NFe ainda sem protocolo
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido, nao for de uma NFC-e ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfeNfce(final String xmlNfe, final DanfeCreditos creditos) {
+        return new NFGeraDanfeNfce().gerar(xmlNfe, creditos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF a partir da nota processada, em papel de 80 mm, sem logotipo e sem rodape personalizado.
+     *
+     * @param nota nota processada (NFC-e com o protocolo de autorizacao)
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, incompleta, nao for de uma NFC-e ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfeNfce(final NFNotaProcessada nota) {
+        return this.geraDanfeNfce(nota, null);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF a partir da nota processada, em papel de 80 mm e sem logotipo.
+     *
+     * @param nota nota processada (NFC-e com o protocolo de autorizacao)
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, incompleta, nao for de uma NFC-e ou nao tiver o protocolo de autorizacao
+     */
+    public byte[] geraDanfeNfce(final NFNotaProcessada nota, final DanfeCreditos creditos) {
+        return new NFGeraDanfeNfce().gerar(nota, creditos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF, em papel de 80 mm e sem logotipo, com anexos (comprovante de pagamento, confissao de divida etc.) depois do cupom.
+     *
+     * @param xmlNfe XML do nfeProc (NFC-e autorizada) ou, em contingencia off-line, da NFe ainda sem protocolo
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @param anexos blocos de texto impressos depois do cupom, cada um depois de uma linha de corte; a lista pode ser nula ou vazia
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido, nao for de uma NFC-e, nao tiver o protocolo de autorizacao ou a lista tiver um anexo nulo
+     */
+    public byte[] geraDanfeNfce(final String xmlNfe, final DanfeCreditos creditos, final List<DanfeNfceAnexo> anexos) {
+        return new NFGeraDanfeNfce().gerar(xmlNfe, creditos, anexos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF a partir da nota processada, em papel de 80 mm e sem logotipo, com anexos (comprovante de pagamento, confissao de divida etc.) depois do cupom.
+     *
+     * @param nota nota processada (NFC-e com o protocolo de autorizacao)
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @param anexos blocos de texto impressos depois do cupom, cada um depois de uma linha de corte; a lista pode ser nula ou vazia
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, incompleta, nao for de uma NFC-e, nao tiver o protocolo de autorizacao ou a lista tiver um anexo nulo
+     */
+    public byte[] geraDanfeNfce(final NFNotaProcessada nota, final DanfeCreditos creditos, final List<DanfeNfceAnexo> anexos) {
+        return new NFGeraDanfeNfce().gerar(nota, creditos, anexos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF, em papel de 80 mm e sem logotipo, com anexos e margens laterais personalizadas
+     * (para compensar a area nao imprimivel de cada modelo de impressora termica).
+     *
+     * @param xmlNfe XML do nfeProc (NFC-e autorizada) ou, em contingencia off-line, da NFe ainda sem protocolo
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @param anexos blocos de texto impressos depois do cupom, cada um depois de uma linha de corte; a lista pode ser nula ou vazia
+     * @param margemEsquerdaMm margem da esquerda, em milimetros, de 0 a {@link NFGeraDanfeNfce#MARGEM_LATERAL_MAXIMA_MM}; fora da faixa (ou NaN) usa {@link NFGeraDanfeNfce#MARGEM_LATERAL_MM}
+     * @param margemDireitaMm margem da direita, em milimetros, de 0 a {@link NFGeraDanfeNfce#MARGEM_LATERAL_MAXIMA_MM}; fora da faixa (ou NaN) usa {@link NFGeraDanfeNfce#MARGEM_LATERAL_MM}
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se o XML for invalido, nao for de uma NFC-e, nao tiver o protocolo de autorizacao ou a lista tiver um anexo nulo
+     */
+    public byte[] geraDanfeNfce(final String xmlNfe, final DanfeCreditos creditos, final List<DanfeNfceAnexo> anexos, final float margemEsquerdaMm, final float margemDireitaMm) {
+        return new NFGeraDanfeNfce(margemEsquerdaMm, margemDireitaMm).gerar(xmlNfe, creditos, anexos);
+    }
+
+    /**
+     * Gera o cupom DANFE NFC-e (modelo 65) em PDF a partir da nota processada, em papel de 80 mm e sem logotipo, com anexos e margens laterais personalizadas
+     * (para compensar a area nao imprimivel de cada modelo de impressora termica).
+     *
+     * @param nota nota processada (NFC-e com o protocolo de autorizacao)
+     * @param creditos creditos (textos do rodape); se nulo, o cupom sai sem rodape personalizado
+     * @param anexos blocos de texto impressos depois do cupom, cada um depois de uma linha de corte; a lista pode ser nula ou vazia
+     * @param margemEsquerdaMm margem da esquerda, em milimetros, de 0 a {@link NFGeraDanfeNfce#MARGEM_LATERAL_MAXIMA_MM}; fora da faixa (ou NaN) usa {@link NFGeraDanfeNfce#MARGEM_LATERAL_MM}
+     * @param margemDireitaMm margem da direita, em milimetros, de 0 a {@link NFGeraDanfeNfce#MARGEM_LATERAL_MAXIMA_MM}; fora da faixa (ou NaN) usa {@link NFGeraDanfeNfce#MARGEM_LATERAL_MM}
+     * @return bytes do PDF
+     * @throws IllegalArgumentException se a nota for nula, incompleta, nao for de uma NFC-e, nao tiver o protocolo de autorizacao ou a lista tiver um anexo nulo
+     */
+    public byte[] geraDanfeNfce(final NFNotaProcessada nota, final DanfeCreditos creditos, final List<DanfeNfceAnexo> anexos, final float margemEsquerdaMm, final float margemDireitaMm) {
+        return new NFGeraDanfeNfce(margemEsquerdaMm, margemDireitaMm).gerar(nota, creditos, anexos);
     }
 
     /**
@@ -106,8 +295,11 @@ public class WSFacade {
     public NFLoteEnvioRetornoDados enviaLote(final NFLoteEnvio lote, boolean validarXML) throws Exception {
         if (lote.getIndicadorProcessamento().equals(NFLoteIndicadorProcessamento.PROCESSAMENTO_SINCRONO) && lote.getNotas().size() > 1) {
             throw new IllegalArgumentException("Apenas uma nota permitida no modo sincrono!");
-        } else if (lote.getNotas().size() == 0) {
+        } else if (lote.getNotas().isEmpty()) {
             throw new IllegalArgumentException("Nenhuma nota informada no envio do Lote!");
+        }
+        if (this.wsLoteEnvio == null) {
+            this.wsLoteEnvio = new WSLoteEnvio(this.config, this.httpClient);
         }
         return this.wsLoteEnvio.enviaLote(lote, validarXML);
     }
@@ -117,6 +309,9 @@ public class WSFacade {
     }
 
     public NFLoteEnvio getLoteAssinado(final NFLoteEnvio lote) throws Exception {
+        if (this.wsLoteEnvio == null) {
+            this.wsLoteEnvio = new WSLoteEnvio(this.config, this.httpClient);
+        }
         return this.wsLoteEnvio.getLoteAssinado(lote);
     }
 
@@ -131,6 +326,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFLoteEnvioRetorno enviaLoteAssinado(final String loteAssinadoXml, final DFModelo modelo) throws Exception {
+        if (this.wsLoteEnvio == null) {
+            this.wsLoteEnvio = new WSLoteEnvio(this.config, this.httpClient);
+        }
         return this.wsLoteEnvio.enviaLoteAssinado(loteAssinadoXml, modelo);
     }
 
@@ -145,8 +343,11 @@ public class WSFacade {
      * @throws Exception caso nao consiga gerar o xml ou problema de conexao com
      * o sefaz
      */
-    public NFeAutorizacao4Stub.NfeResultMsg getNfeResultMsg(final String loteAssinadoXml, final DFModelo modelo) throws Exception {
-        return this.wsLoteEnvio.comunicaLoteRaw(loteAssinadoXml, modelo, true);
+    public String getNfeResultMsg(final String loteAssinadoXml, final DFModelo modelo) throws Exception {
+        if (this.wsLoteEnvio == null) {
+            this.wsLoteEnvio = new WSLoteEnvio(this.config, this.httpClient);
+        }
+        return this.wsLoteEnvio.efetuaComunicacaoLote(loteAssinadoXml, modelo, true);
     }
 
     /**
@@ -159,6 +360,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFLoteConsultaRetorno consultaLote(final String numeroRecibo, final DFModelo modelo) throws Exception {
+        if (this.wsLoteConsulta == null) {
+            this.wsLoteConsulta = new WSLoteConsulta(this.config, this.httpClient);
+        }
         return this.wsLoteConsulta.consultaLote(numeroRecibo, modelo);
     }
 
@@ -172,6 +376,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFStatusServicoConsultaRetorno consultaStatus(final DFUnidadeFederativa uf, final DFModelo modelo) throws Exception {
+        if (this.wsStatusConsulta == null) {
+            this.wsStatusConsulta = new WSStatusConsulta(this.config, this.httpClient);
+        }
         return this.wsStatusConsulta.consultaStatus(uf, modelo);
     }
 
@@ -184,6 +391,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFNotaConsultaRetorno consultaNota(final String chaveDeAcesso) throws Exception {
+        if (this.wsNotaConsulta == null) {
+            this.wsNotaConsulta = new WSNotaConsulta(this.config, this.httpClient);
+        }
         return this.wsNotaConsulta.consultaNota(chaveDeAcesso);
     }
 
@@ -192,10 +402,13 @@ public class WSFacade {
      *
      * @param chaveDeAcesso chave de acesso da nota
      * @return dados da consulta da nota retornado pelo webservice
-     * @throws Exception caso nao consiga gerar o xml ou problema de conexao com
-     * o sefaz
+     * @throws IOException caso nao consiga se conectar a SEFAZ.
+     * @throws DFSoapFaultException caso a SEFAZ devolva um soap:Fault.
      */
-    public String consultaNotaAsString(final String chaveDeAcesso) throws Exception {
+    public String consultaNotaAsString(final String chaveDeAcesso) throws IOException, DFSoapFaultException {
+        if (this.wsNotaConsulta == null) {
+            this.wsNotaConsulta = new WSNotaConsulta(this.config, this.httpClient);
+        }
         return this.wsNotaConsulta.consultaNotaAsString(chaveDeAcesso);
     }
 
@@ -211,6 +424,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno corrigeNota(final String chaveDeAcesso, final String textoCorrecao, final int numeroSequencialEvento) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.corrigeNota(chaveDeAcesso, textoCorrecao, numeroSequencialEvento);
     }
 
@@ -225,6 +441,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno corrigeNotaAssinada(final String chave, final String eventoAssinadoXml) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.corrigeNotaAssinada(chave, eventoAssinadoXml);
     }
 
@@ -237,18 +456,30 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno corrigeNotaAssinada(final String eventoAssinadoXml) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.corrigeNotaAssinada(eventoAssinadoXml);
     }
 
     public NFProtocoloEventoCartaCorrecao corrigeNotaAssinadaProtocolo(final String eventoAssinadoXml) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.corrigeNotaAssinadaProtocolo(eventoAssinadoXml);
     }
 
     public NFProtocoloEventoCartaCorrecao corrigeNotaAssinadaProtocolo(final String chaveDeAcesso, final String textoCorrecao, final int numeroSequencialEvento) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.corrigeNotaAssinadaProtocolo(getXmlAssinado(chaveDeAcesso, textoCorrecao, numeroSequencialEvento));
     }
 
     public String getXmlAssinado(final String chaveDeAcesso, final String textoCorrecao, final int numeroSequencialEvento) throws Exception {
+        if (this.wsCartaCorrecao == null) {
+            this.wsCartaCorrecao = new WSCartaCorrecao(this.config, this.httpClient);
+        }
         return this.wsCartaCorrecao.getXmlAssinado(chaveDeAcesso, textoCorrecao, numeroSequencialEvento);
     }
 
@@ -263,6 +494,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFCancelamentoRetornoDados cancelaNota(final String chave, final String numeroProtocolo, final String motivo) throws Exception {
+        if (this.wsCancelamento == null) {
+            this.wsCancelamento = new WSCancelamento(this.config, this.httpClient);
+        }
         return this.wsCancelamento.cancelaNota(chave, numeroProtocolo, motivo, 1);
     }
 
@@ -278,6 +512,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFCancelamentoRetornoDados cancelaNota(final String chave, final String numeroProtocolo, final String motivo, final int numeroSequencial) throws Exception {
+        if (this.wsCancelamento == null) {
+            this.wsCancelamento = new WSCancelamento(this.config, this.httpClient);
+        }
         return this.wsCancelamento.cancelaNota(chave, numeroProtocolo, motivo, numeroSequencial);
     }
 
@@ -292,6 +529,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno cancelaNotaAssinada(final String chave, final String eventoAssinadoXml) throws Exception {
+        if (this.wsCancelamento == null) {
+            this.wsCancelamento = new WSCancelamento(this.config, this.httpClient);
+        }
         return this.wsCancelamento.cancelaNotaAssinada(chave, eventoAssinadoXml);
     }
     
@@ -308,6 +548,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno cancelaNotaPorSubstituicao(final String chave, final String numeroProtocolo, final String motivo, final String versaoAplicativoAutorizador, final String chaveSubstituta) throws Exception {
+        if (this.wsCancelamento == null) {
+            this.wsCancelamento = new WSCancelamento(this.config, this.httpClient);
+        }
         return this.wsCancelamento.cancelaNotaPorSubstituicao(chave, numeroProtocolo, motivo, versaoAplicativoAutorizador, chaveSubstituta);
     }
 
@@ -322,6 +565,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFRetornoEventoInutilizacao inutilizaNotaAssinada(final String eventoAssinadoXml, final DFModelo modelo) throws Exception {
+        if (this.wsInutilizacao == null) {
+            this.wsInutilizacao = new WSInutilizacao(this.config, this.httpClient);
+        }
         return this.wsInutilizacao.inutilizaNotaAssinada(eventoAssinadoXml, modelo);
     }
 
@@ -340,6 +586,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFRetornoEventoInutilizacao inutilizaNota(final int anoInutilizacaoNumeracao, final String cnpjEmitente, final String serie, final String numeroInicial, final String numeroFinal, final String justificativa, final DFModelo modelo) throws Exception {
+        if (this.wsInutilizacao == null) {
+            this.wsInutilizacao = new WSInutilizacao(this.config, this.httpClient);
+        }
         return this.wsInutilizacao.inutilizaNota(anoInutilizacaoNumeracao, cnpjEmitente, serie, numeroInicial, numeroFinal, justificativa, modelo);
     }
 
@@ -353,6 +602,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFRetornoConsultaCadastro consultaCadastro(final String cnpj, final DFUnidadeFederativa uf) throws Exception {
+        if (this.wsConsultaCadastro == null) {
+            this.wsConsultaCadastro = new WSConsultaCadastro(this.config, this.httpClient);
+        }
         return this.wsConsultaCadastro.consultaCadastro(cnpj, uf);
     }
 
@@ -369,10 +621,16 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno manifestaDestinatarioNota(final String chave, final NFTipoEventoManifestacaoDestinatario tipoEvento, final String motivo, final String cnpj) throws Exception {
+        if (this.wSManifestacaoDestinatario == null) {
+            this.wSManifestacaoDestinatario = new WSManifestacaoDestinatario(this.config, this.httpClient);
+        }
         return this.wSManifestacaoDestinatario.manifestaDestinatarioNota(chave, tipoEvento, motivo, cnpj);
     }
 
     public NFProtocoloEventoManifestacaoDestinatario manifestaDestinatarioNotaProtocolo(final String chave, final NFTipoEventoManifestacaoDestinatario tipoEvento, final String motivo, final String cnpj) throws Exception {
+        if (this.wSManifestacaoDestinatario == null) {
+            this.wSManifestacaoDestinatario = new WSManifestacaoDestinatario(this.config, this.httpClient);
+        }
         return this.wSManifestacaoDestinatario.manifestaDestinatarioNotaProtocolo(chave, tipoEvento, motivo, cnpj);
     }
 
@@ -388,6 +646,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoRetorno manifestaDestinatarioNotaAssinada(final String chave, final String eventoAssinadoXml) throws Exception {
+        if (this.wSManifestacaoDestinatario == null) {
+            this.wSManifestacaoDestinatario = new WSManifestacaoDestinatario(this.config, this.httpClient);
+        }
         return this.wSManifestacaoDestinatario.manifestaDestinatarioNotaAssinada(chave, eventoAssinadoXml);
     }
 
@@ -413,6 +674,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFDistribuicaoIntRetorno consultarDistribuicaoDFe(final String cpfOuCnpj, final DFUnidadeFederativa uf, final String chaveAcesso, final String nsu, final String ultNsu) throws Exception {
+        if (this.wSDistribuicaoNFe == null) {
+            this.wSDistribuicaoNFe = new WSDistribuicaoNFe(this.config, this.httpClient);
+        }
         return this.wSDistribuicaoNFe.consultar(cpfOuCnpj, uf, chaveAcesso, nsu, ultNsu);
     }
 
@@ -425,6 +689,9 @@ public class WSFacade {
      * o sefaz
      */
     public NFEnviaEventoEpecRetorno enviaLoteEpec(final NFLoteEnvio lote) throws Exception {
+        if (this.wsEpec == null) {
+            this.wsEpec = new WSEpec(this.config, this.httpClient);
+        }
         return this.wsEpec.enviaEpec(lote);
     }
 
@@ -437,6 +704,9 @@ public class WSFacade {
      * o ambiente nacional da sefaz
      */
     public NFEnviaEventoEpecRetorno enviaEpec(final NFLoteEnvio lote) throws Exception {
+        if (this.wsEpec == null) {
+            this.wsEpec = new WSEpec(this.config, this.httpClient);
+        }
         return this.wsEpec.enviaEpec(lote);
     }
 
@@ -449,14 +719,23 @@ public class WSFacade {
      * o ambiente nacional da sefaz
      */
     public NFEnviaEventoEpecRetorno enviaEpecAssinado(final String epecAssinadoXml) throws Exception {
+        if (this.wsEpec == null) {
+            this.wsEpec = new WSEpec(this.config, this.httpClient);
+        }
         return this.wsEpec.enviaEpecAssinado(epecAssinadoXml);
     }
 
     public NFEnviaEventoRetorno enviaAtualizacaoDataPrevisaoEntrega(final String chaveAcesso, final LocalDate dataPrevisaoEntrega, final DFUnidadeFederativa ufAutorEvento, final NFEventoTipoAutor tpAutorEvento, final int numeroSequencialEvento) throws Exception {
+        if (this.wsAtualizacaoDataPrevisaoEntrega == null) {
+            this.wsAtualizacaoDataPrevisaoEntrega = new WSAtualizacaoDataPrevisaoEntrega(this.config, this.httpClient);
+        }
         return this.wsAtualizacaoDataPrevisaoEntrega.atualizaDataPrevisaoEntrega(chaveAcesso, dataPrevisaoEntrega, ufAutorEvento, tpAutorEvento, numeroSequencialEvento);
     }
 
     public NFEnviaEventoRetorno aceiteDebitoApuracao(final String chaveAcesso, final int indAceitacao, final DFUnidadeFederativa ufEmitenteEvento, final int numeroSequencialEvento, final String cnpjCpfAutorEvento) throws Exception {
+        if (this.wsAceiteDebitoAPuracao == null) {
+            this.wsAceiteDebitoAPuracao = new WSAceiteDebitoApuracao(this.config, this.httpClient);
+        }
         return this.wsAceiteDebitoAPuracao.aceiteDebitoApuracao(chaveAcesso, indAceitacao, ufEmitenteEvento, numeroSequencialEvento, cnpjCpfAutorEvento);
     }
 
@@ -464,6 +743,9 @@ public class WSFacade {
             final String chaveAcesso, final String codigoEventoAutorizado, final String numeroProtocoloEvento,
             final int numeroSequencialEventoCancelar, final DFUnidadeFederativa ufEmitenteEvento, final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsCancelametoEvento == null) {
+            this.wsCancelametoEvento = new WSCancelametoEvento(this.config, this.httpClient);
+        }
         return this.wsCancelametoEvento.cancelamentoEvento(
                 chaveAcesso, codigoEventoAutorizado, numeroProtocoloEvento, numeroSequencialEventoCancelar,
                 ufEmitenteEvento, cnpjCpfAutorEvento
@@ -484,6 +766,9 @@ public class WSFacade {
     public NFEnviaEventoRetorno enviaInformacaoEfetivoPagamentoIntegral(
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento, final int numeroSequencialEvento
     ) throws Exception {
+        if (this.wsInfoEfetPagIntegral == null) {
+            this.wsInfoEfetPagIntegral = new WSInfoEfetPagIntegral(this.config, this.httpClient);
+        }
         return this.wsInfoEfetPagIntegral
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, numeroSequencialEvento)
                 .gerarEnviarEvento();
@@ -502,10 +787,13 @@ public class WSFacade {
     public NFEnviaEventoRetorno enviaSolicitacaoApropriacaoCreditoPresumido(
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento,
             final List<NFDetGrupoCreditoPresumido> gruposCreditoPresumido, final int numeroSequencialEvento,
-            final String cnpjCpfAutorEvento
+            final String cnpjCpfAutorEvento, final NFEventoTipoAutor tpAutorEvento
     ) throws Exception {
+        if (this.wsSolicitacaoApropriacaoCreditoPresumido == null) {
+            this.wsSolicitacaoApropriacaoCreditoPresumido = new WSSolicitacaoApropriacaoCreditoPresumido(this.config, this.httpClient);
+        }
         return this.wsSolicitacaoApropriacaoCreditoPresumido
-                .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposCreditoPresumido, numeroSequencialEvento, cnpjCpfAutorEvento)
+                .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposCreditoPresumido, numeroSequencialEvento, cnpjCpfAutorEvento, tpAutorEvento)
                 .gerarEnviarEvento();
     }
     /**
@@ -523,6 +811,9 @@ public class WSFacade {
             final List<NFDetGrupoPerecimento> gruposPerecimento, final int numeroSequencialEvento,
             final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsRouboTransporteAdquirente == null) {
+            this.wsRouboTransporteAdquirente = new WSRouboTransporteAdquirente(this.config, this.httpClient);
+        }
         return this.wsRouboTransporteAdquirente
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposPerecimento, numeroSequencialEvento, cnpjCpfAutorEvento)
                 .gerarEnviarEvento();
@@ -541,6 +832,9 @@ public class WSFacade {
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento,
             final List<NFDetGrupoPerecimentoFornecedor> gruposPerecimento, final int numeroSequencialEvento
     ) throws Exception {
+        if (this.wsRouboTransporteFornecedor == null) {
+            this.wsRouboTransporteFornecedor = new WSRouboTransporteFornecedor(this.config, this.httpClient);
+        }
         return this.wsRouboTransporteFornecedor
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposPerecimento, numeroSequencialEvento)
                 .gerarEnviarEvento();
@@ -561,6 +855,9 @@ public class WSFacade {
             final List<NFDetGrupoConsumoCombustivel> grupoConsumoCombustivel, final int numeroSequencialEvento,
             final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsSolicitacaoApropriacaoCreditoCombustivel == null) {
+            this.wsSolicitacaoApropriacaoCreditoCombustivel = new WSSolicitacaoApropriacaoCreditoCombustivel(this.config, this.httpClient);
+        }
         return this.wsSolicitacaoApropriacaoCreditoCombustivel
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, grupoConsumoCombustivel, numeroSequencialEvento, cnpjCpfAutorEvento)
                 .gerarEnviarEvento();
@@ -580,6 +877,9 @@ public class WSFacade {
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento,
             final List<NFDetGrupoCredito> gruposCredito, final int numeroSequencialEvento, final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte == null) {
+            this.wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte = new WSSolicitacaoApropriacaoCreditoBensAtdAdquirinte(this.config, this.httpClient);
+        }
         return this.wsSolicitacaoApropriacaoCreditoBensAtdAdquirinte
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposCredito, numeroSequencialEvento, cnpjCpfAutorEvento)
                 .gerarEnviarEvento();
@@ -597,6 +897,9 @@ public class WSFacade {
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento,
             final List<NFDetGrupoItemNaoFornecido> gruposItemNaoFornecedo, final int numeroSequencialEvento
     ) throws Exception {
+        if (this.wsNaoFornecimentoPagamentoAntecipado == null) {
+            this.wsNaoFornecimentoPagamentoAntecipado = new WSNaoFornecimentoPagamentoAntecipado(this.config, this.httpClient);
+        }
         return this.wsNaoFornecimentoPagamentoAntecipado
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposItemNaoFornecedo, numeroSequencialEvento)
                 .gerarEnviarEvento();
@@ -612,11 +915,16 @@ public class WSFacade {
      * @param cnpjCpfAutorEvento cnpj ou cpf do autor do evento sem formatação.
      * @return {@link NFEnviaEventoRetorno} dados do evento retornado pelo webservice
      * @throws Exception
+     * @since Evento removido em razão da revogação do § 6º do art. 57. da Lei Complementar nº 214/2025 pela Lei Complementar nº 227/2026
      */
+    @Deprecated()
     public NFEnviaEventoRetorno enviaDestinacaoItemConsumoPessoal(
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento, final List<NFDetGrupoConsumo> grupoItensConsumo,
             final int numeroSequencialEvento, final NFEventoTipoAutor tpAutorEvento, final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsDestinacaoItemConsumoPessoal == null) {
+            this.wsDestinacaoItemConsumoPessoal = new WSDestinacaoItemConsumoPessoal(this.config, this.httpClient);
+        }
         return this.wsDestinacaoItemConsumoPessoal
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, grupoItensConsumo, numeroSequencialEvento, tpAutorEvento, cnpjCpfAutorEvento)
                 .gerarEnviarEvento();
@@ -636,6 +944,9 @@ public class WSFacade {
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento, final List<NFDetGrupoImobilizacao> gruposImobilizacao,
             final int numeroSequencialEvento, final String cnpjCpfAutorEvento
     ) throws Exception {
+        if (this.wsImobilizacaoItem == null) {
+            this.wsImobilizacaoItem = new WSImobilizacaoItem(this.config, this.httpClient);
+        }
         return this.wsImobilizacaoItem
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposImobilizacao, numeroSequencialEvento, cnpjCpfAutorEvento)
                 .gerarEnviarEvento();
@@ -653,8 +964,48 @@ public class WSFacade {
             final String chaveAcesso, final DFUnidadeFederativa ufEmitenteEvento, final List<NFDetGrupoConsumoZFM> gruposImobilizacao,
             final int numeroSequencialEvento
     ) throws Exception {
+        if (this.wsImportacaoALCZFMNaoConvertidaIsencao == null) {
+            this.wsImportacaoALCZFMNaoConvertidaIsencao = new WSImportacaoALCZFMNaoConvertidaIsencao(this.config, this.httpClient);
+        }
         return this.wsImportacaoALCZFMNaoConvertidaIsencao
                 .adicionarDadosEvento(chaveAcesso, ufEmitenteEvento, gruposImobilizacao, numeroSequencialEvento)
                 .gerarEnviarEvento();
+    }
+
+    /**
+     * Servico exclusivo da SEFAZ-SP para obtencao da relacao de chaves das NFC-e recebidas pela Sefaz num
+     * determinado periodo, para o contribuinte identificado pelo CNPJ do certificado digital utilizado na chamada.
+     * Limites do servico (NT SAE-NFC-e v1.0.0): consulta apenas os ultimos 100 dias, retorna no maximo 2.000 chaves
+     * por consulta e possui limite de requisicoes por IP.
+     * Quando a listagem vem incompleta, o campo dhEmisUltNfce do retorno traz a data e hora de emissao da ultima NFC-e
+     * listada; use-o como data e hora inicial de uma nova consulta para obter as chaves restantes.
+     *
+     * @param dataHoraInicial data e hora inicial do periodo de busca
+     * @param dataHoraFinal data e hora final do periodo de busca (opcional)
+     * @return dados da listagem de chaves de NFC-e retornado pelo webservice
+     * @throws Exception caso nao consiga gerar o xml ou problema de conexao com
+     * o sefaz
+     */
+    public NFCeListagemChavesRetorno consultaListagemChavesNFCe(final LocalDateTime dataHoraInicial, final LocalDateTime dataHoraFinal) throws Exception {
+        if (this.wsNFCeListagemChaves == null) {
+            this.wsNFCeListagemChaves = new WSNFCeListagemChaves(this.config, this.httpClient);
+        }
+        return this.wsNFCeListagemChaves.consultaListagemChaves(dataHoraInicial, dataHoraFinal);
+    }
+
+    /**
+     * Servico exclusivo da SEFAZ-SP para download do XML de uma NFC-e (e seus eventos associados) a partir da sua chave de acesso.
+     * Limites do servico (NT SAE-NFC-e v1.0.0): somente NFC-e dos ultimos 100 dias e limite de requisicoes por IP.
+     *
+     * @param chaveDeAcesso chave de acesso da NFC-e
+     * @return dados do download do XML da NFC-e retornado pelo webservice
+     * @throws Exception caso nao consiga gerar o xml ou problema de conexao com
+     * o sefaz
+     */
+    public NFCeDownloadXMLRetorno downloadXMLNFCe(final String chaveDeAcesso) throws Exception {
+        if (this.wsNFCeDownloadXML == null) {
+            this.wsNFCeDownloadXML = new WSNFCeDownloadXML(this.config, this.httpClient);
+        }
+        return this.wsNFCeDownloadXML.downloadXML(chaveDeAcesso);
     }
 }
