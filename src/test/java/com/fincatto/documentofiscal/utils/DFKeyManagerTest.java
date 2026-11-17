@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.security.cert.X509Certificate;
 
@@ -71,7 +72,8 @@ public class DFKeyManagerTest {
 
     private static void gerarChave(final Path keystorePath, final String alias, final String dn) throws IOException, InterruptedException {
         final Process processo = new ProcessBuilder(
-                "keytool", "-genkeypair",
+                // keytool do mesmo JDK que roda os testes; nao depende do PATH
+                Paths.get(System.getProperty("java.home"), "bin", "keytool").toString(), "-genkeypair",
                 "-alias", alias,
                 "-keyalg", "RSA",
                 "-keysize", "1024",

@@ -10,6 +10,7 @@ import com.fincatto.documentofiscal.cte200.classes.CTAutorizador;
 import com.fincatto.documentofiscal.utils.DFHttpClient;
 import com.fincatto.documentofiscal.utils.DFSoapEnvelope;
 import com.fincatto.documentofiscal.utils.DFSoapFaultException;
+import com.fincatto.documentofiscal.utils.DFUtils;
 import com.fincatto.documentofiscal.validadores.DFXMLValidador;
 import org.apache.commons.lang3.StringUtils;
 
@@ -133,7 +134,7 @@ public class WSDistribuicaoCTe {
         final byte[] conteudo = Base64.getDecoder().decode(conteudoEncode);
         // le os bytes crus (sem readLine), preservando quebras de linha dentro de campos texto do XML
         try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(conteudo))) {
-            return new String(gis.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(DFUtils.lerTodosBytes(gis), StandardCharsets.UTF_8);
         }
     }
 }

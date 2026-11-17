@@ -317,7 +317,7 @@ class NFGeraDanfeNfceTest {
 
     private static String conteudoDaPagina(final byte[] pdf) throws Exception {
         try (final PDDocument documento = Loader.loadPDF(pdf); java.io.InputStream conteudo = documento.getPage(0).getContents()) {
-            return new String(conteudo.readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1);
+            return new String(com.fincatto.documentofiscal.utils.DFUtils.lerTodosBytes(conteudo), java.nio.charset.StandardCharsets.ISO_8859_1);
         }
     }
 

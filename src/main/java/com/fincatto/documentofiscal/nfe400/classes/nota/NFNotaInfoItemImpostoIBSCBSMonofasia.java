@@ -18,15 +18,15 @@ public class NFNotaInfoItemImpostoIBSCBSMonofasia extends DFBase {
 
   private static final long serialVersionUID = -366528394939416671L;
 
-  @Deprecated(since = "2025.002-RTC-1.5", forRemoval = true)
+  @Deprecated
   @Element(required = false)
   private NFNotaInfoItemImpostoIBSCBSMonofasicaGMonoPadrao gMonoPadrao; // UB84a
 
-  @Deprecated(since = "2025.002-RTC-1.5", forRemoval = true)
+  @Deprecated
   @Element(required = false)
   private NFNotaInfoItemImpostoIBSCBSMonofasicaGMonoReten gMonoReten; // UB90
 
-  @Deprecated(since = "2025.002-RTC-1.5", forRemoval = true)
+  @Deprecated
   @Element(required = false)
   private NFNotaInfoItemImpostoIBSCBSMonofasicaGMonoRet gMonoRet; // UB94
 

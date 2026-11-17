@@ -1,7 +1,7 @@
 package com.fincatto.documentofiscal.validadores;
 
-import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
 
 public class DFXMLValidadorTest {
@@ -20,9 +20,9 @@ public class DFXMLValidadorTest {
     public void deveResolverOsTiposGlobaisDosIncludesDoSchemaDaNFe400() throws Exception {
         try {
             DFXMLValidador.validaNota400("<NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\"/>");
-            Assert.fail("XML incompleto deveria ser rejeitado pelo schema");
+            Assertions.fail("XML incompleto deveria ser rejeitado pelo schema");
         } catch (final SAXException e) {
-            Assert.assertFalse(e.getMessage(), e.getMessage().contains("src-resolve"));
+            Assertions.assertFalse(e.getMessage().contains("src-resolve"), e.getMessage());
         }
     }
 }

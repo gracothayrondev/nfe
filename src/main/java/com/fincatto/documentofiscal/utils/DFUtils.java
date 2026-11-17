@@ -1,5 +1,8 @@
 package com.fincatto.documentofiscal.utils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -12,6 +15,19 @@ public abstract class DFUtils {
     private static final List<String> CPFS_INVALIDOS = Arrays.asList("00000000000", "11111111111", "22222222222",
             "33333333333", "44444444444", "55555555555", "66666666666", "77777777777", "88888888888", "99999999999",
             "12345678909");
+
+    /**
+     * Equivalente a InputStream.readAllBytes() (Java 9+), para manter compatibilidade com Java 8.
+     */
+    public static byte[] lerTodosBytes(final InputStream entrada) throws IOException {
+        final ByteArrayOutputStream saida = new ByteArrayOutputStream();
+        final byte[] buffer = new byte[4096];
+        int lidos;
+        while ((lidos = entrada.read(buffer)) != -1) {
+            saida.write(buffer, 0, lidos);
+        }
+        return saida.toByteArray();
+    }
 
     /**
      * Verifica se o CNPJ informado eh valido. <br>

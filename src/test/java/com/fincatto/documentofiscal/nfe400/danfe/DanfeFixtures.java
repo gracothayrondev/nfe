@@ -110,7 +110,7 @@ public final class DanfeFixtures {
         ibscbs.setGIBSCBS(grupo);
         item.getImposto().setIbsCbs(ibscbs);
         final NFNotaInfoItemImpostoIS is = new NFNotaInfoItemImpostoIS();
-        is.setCstIS(com.fincatto.documentofiscal.nfe400.classes.NFNotaInfoImpostoTributacaoIS.TRIBUTACAO_INTEGRAL);
+        is.setCstIS(com.fincatto.documentofiscal.nfe400.classes.NFNotaInfoImpostoTributacaoIS.TRIBUTACAO_INTEGRAL.getCodigo());
         is.setCClassTribIS("654321");
         is.setVBCIS(new BigDecimal("900.00"));
         is.setPIS(new BigDecimal("9.9999"));

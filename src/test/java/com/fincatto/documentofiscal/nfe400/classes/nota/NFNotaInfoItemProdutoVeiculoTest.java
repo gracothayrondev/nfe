@@ -11,13 +11,7 @@ public class NFNotaInfoItemProdutoVeiculoTest {
 
     @Test
     public void naoDevePermitirPotenciaComTamanhoInvalido() {
-        Assertions.assertThrows(IllegalStateException.class, () -> {
-            try {
-                new NFNotaInfoItemProdutoVeiculo().setPotencia("ABC");
-            } catch (final IllegalStateException e) {
-                new NFNotaInfoItemProdutoVeiculo().setTipoPintura("ABCDE");
-            }
-        });
+        Assertions.assertThrows(IllegalStateException.class, () -> new NFNotaInfoItemProdutoVeiculo().setPotencia("ABCDE"));
     }
 
     @Test
@@ -43,13 +37,7 @@ public class NFNotaInfoItemProdutoVeiculoTest {
 
     @Test
     public void naoDevePermitirNumeroSerieComTamanhoInvalido() {
-        Assertions.assertThrows(IllegalStateException.class, () -> {
-            try {
-                new NFNotaInfoItemProdutoVeiculo().setNumeroSerie("XBxVyiVV");
-            } catch (final IllegalStateException e) {
-                new NFNotaInfoItemProdutoVeiculo().setNumeroSerie("XBxVyiVVD1");
-            }
-        });
+        Assertions.assertThrows(IllegalStateException.class, () -> new NFNotaInfoItemProdutoVeiculo().setNumeroSerie("XBxVyiVVD1"));
     }
 
     @Test
@@ -64,13 +52,7 @@ public class NFNotaInfoItemProdutoVeiculoTest {
 
     @Test
     public void naoDevePermitirDistanciaEntreEixosComTamanhoInvalido() {
-        Assertions.assertThrows(IllegalStateException.class, () -> {
-            try {
-                new NFNotaInfoItemProdutoVeiculo().setDistanciaEntreEixos("ABC");
-            } catch (final IllegalStateException e) {
-                new NFNotaInfoItemProdutoVeiculo().setDistanciaEntreEixos("ABCDE");
-            }
-        });
+        Assertions.assertThrows(IllegalStateException.class, () -> new NFNotaInfoItemProdutoVeiculo().setDistanciaEntreEixos("ABCDE"));
     }
 
     @Test

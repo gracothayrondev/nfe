@@ -48,8 +48,8 @@ final class DFSchemaResourceResolver implements LSResourceResolver {
     private final String pacote;
 
     /**
-     * @param pacote nome da pasta do pacote de schemas dentro de schemas/, por exemplo
-     *               PL_010e_NT2025.002_v1.01
+     * @param pacote caminho da pasta do pacote de schemas no classpath, por exemplo
+     *               schemas/PL_010e_NT2025.002_v1.01
      */
     DFSchemaResourceResolver(final String pacote) {
         this.pacote = pacote;
@@ -82,7 +82,7 @@ final class DFSchemaResourceResolver implements LSResourceResolver {
      */
     static String caminhoDoRecurso(final String pacote, final String systemId) {
         final String nomeArquivo = systemId.substring(systemId.lastIndexOf('/') + 1);
-        return String.format("schemas/%s/%s", pacote, nomeArquivo);
+        return pacote + "/" + nomeArquivo;
     }
 
     /**

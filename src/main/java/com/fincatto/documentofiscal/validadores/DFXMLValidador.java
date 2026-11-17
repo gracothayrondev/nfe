@@ -21,7 +21,7 @@ public final class DFXMLValidador {
      * nao da reabertura da URL do recurso. Ver {@link DFSchemaResourceResolver} para o motivo,
      * que envolve jar aninhado sob caminho com acento no Windows.
      *
-     * @param pacote nome da pasta do pacote de schemas dentro de schemas/
+     * @param pacote caminho da pasta do pacote de schemas no classpath (ex.: schemas/PL_010f_v1.04)
      * @param xsd    nome do arquivo XSD principal dentro do pacote
      */
     private static boolean validaComPacote(final String xml, final String pacote, final String xsd) throws IOException, SAXException {
@@ -119,7 +119,7 @@ public final class DFXMLValidador {
     }
 
     public static boolean valida400(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_010e_NT2025.002_v1.01", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_NFE400, xsd);
     }
 
     public static boolean validaLote400(final String arquivoXML) throws Exception {
@@ -147,7 +147,7 @@ public final class DFXMLValidador {
      */
     private static boolean validaMDF(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
         System.setProperty("jdk.xml.maxOccurLimit", "20000");
-        return DFXMLValidador.validaComPacote(xml, "PL_MDFe_300b_NT012025_1.03", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_MDFE300, xsd);
     }
 
     public static boolean validaLoteMDFe(final String arquivoXML) throws Exception {
@@ -171,7 +171,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaCTe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_CTe_300a_NT2022.001", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_CTE300, xsd);
     }
 
     public static boolean validaLoteCTe300(final String arquivoXML) throws Exception {
@@ -223,7 +223,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaCTe400(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_CTe_400_NT2025.001_RTC_1.14", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_CTE400, xsd);
     }
 
     public static boolean validaNotaCte400(final String arquivoXML) throws Exception {
@@ -287,17 +287,17 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaDfe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_NFeDistDFe_102", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_NFE_DIST_DFE, xsd);
     }
     private static boolean validaDistribuicaoCTe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_CTeDistDFe_100", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_CTE_DIST_DFE, xsd);
     }
     public static boolean validaDistribuicaoCTe(final String arquivoXML) throws IOException, SAXException, URISyntaxException {
         return DFXMLValidador.validaDistribuicaoCTe(arquivoXML, "distDFeInt_v1.00.xsd");
     }
 
     private static boolean validaDistribuicaoMDFe(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "PL_MDFeDistDFe_100", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_MDFE_DIST_DFE, xsd);
     }
     public static boolean validaDistribuicaoMDFe(final String arquivoXML) throws IOException, SAXException, URISyntaxException {
         return DFXMLValidador.valida(arquivoXML, DFXMLValidador.PACOTE_MDFE_DIST_DFE, "distDFeInt_v1.00.xsd");
@@ -308,7 +308,7 @@ public final class DFXMLValidador {
     }
 
     private static boolean validaEpec(final String xml, final String xsd) throws IOException, SAXException, URISyntaxException {
-        return DFXMLValidador.validaComPacote(xml, "Evento_EPEC_PL_v1.01", xsd);
+        return DFXMLValidador.validaComPacote(xml, PACOTE_EPEC, xsd);
     }
 
     public static boolean validaEpec(final String arquivoXML) throws Exception {
